@@ -1,0 +1,133 @@
+//THIS IS THE HTML FILE
+
+<div id="map-canvas" style="border: 2px solid #3872ac;"></div>
+
+
+//THIS IS THE CSS FILE
+
+html, body, #map-canvas {
+    height: 100%;
+    width: 100%;
+    margin: 0px;
+    padding: 0px
+}
+
+
+// THIS IS THE JS FILE
+
+var map;
+
+var curvature = 0.5; // how curvy to make the arc
+
+function init() {
+    var Map = google.maps.Map,
+        LatLng = google.maps.LatLng,
+        LatLngBounds = google.maps.LatLngBounds,
+        Marker = google.maps.Marker,
+        Point = google.maps.Point;
+
+    // This is the initial location of the points
+    // (you can drag the markers around after the map loads)
+    var pos1 = new LatLng(48.8566,2.3522);
+    var pos2 = new LatLng(30.3752,76.7821);
+
+    var bounds = new LatLngBounds();
+    bounds.extend(pos1);
+    bounds.extend(pos2);
+
+    map = new Map(document.getElementById('map-canvas'), {
+        center: bounds.getCenter(),
+        zoom: 12
+    });
+    map.fitBounds(bounds);
+
+    var markerP1 = new Marker({
+        position: pos1,
+        draggable: true,
+        map: map
+    });
+    var markerP2 = new Marker({
+        position: pos2,
+        draggable: true,
+        map: map
+    });
+
+    var curveMarker;
+
+    function updateCurveMarker() {
+        var pos1 = markerP1.getPosition(), // latlng
+            pos2 = markerP2.getPosition(),
+            projection = map.getProjection(),
+            p1 = projection.fromLatLngToPoint(pos1), // xy
+            p2 = projection.fromLatLngToPoint(pos2);
+
+        // Calculate the arc.
+        // To simplify the math, these points 
+        // are all relative to p1:
+        var e = new Point(p2.x - p1.x, p2.y - p1.y), // endpoint (p2 relative to p1)
+            m = new Point(e.x / 2, e.y / 2), // midpoint
+            o = new Point(e.y, -e.x), // orthogonal
+            c = new Point( // curve control point
+                m.x + curvature * o.x,
+                m.y + curvature * o.y);
+
+        var pathDef = 'M 0,0 ' +
+            'q ' + c.x + ',' + c.y + ' ' + e.x + ',' + e.y;
+
+        var zoom = map.getZoom(),
+            scale = 1 / (Math.pow(2, -zoom));
+
+        var symbol = {
+            path: pathDef,
+            scale: scale,
+            strokeWeight: 1,
+            fillColor: 'none'
+        };
+
+        // Define a symbol using SVG path notation, with an opacity of 1.
+        var lineSymbol = {
+          path: 'M 0,-2 0,0.5',
+          strokeOpacity: 1,
+          strokeWeight: 2,
+          scale: 4
+        };
+
+        // Create the polyline, passing the symbol in the 'icons' property.
+        // Give the line an opacity of 0.
+        // Repeat the symbol at intervals of 20 pixels to create the dashed effect.
+        var line = new google.maps.Polyline({
+          path: [pos1, pos2],
+          strokeOpacity: 0,
+          strokeColor: 'green',
+          icons: [{
+            icon: lineSymbol,
+            offset: '0',
+            repeat: '4%'
+          }],
+          map: map
+        });
+      
+        if (!curveMarker) {
+            curveMarker = new Marker({
+                position: pos1,
+                clickable: false,
+                icon: symbol,
+                zIndex: 0, // behind the other markers
+                map: map
+            });
+        } else {
+            curveMarker.setOptions({
+                position: pos1,
+                icon: symbol,
+            });
+        }
+    }
+
+    google.maps.event.addListener(map, 'projection_changed', updateCurveMarker);
+    google.maps.event.addListener(map, 'zoom_changed', updateCurveMarker);
+
+    google.maps.event.addListener(markerP1, 'position_changed', updateCurveMarker);
+    google.maps.event.addListener(markerP2, 'position_changed', updateCurveMarker);
+}
+
+google.maps.event.addDomListener(window, 'load', init);
